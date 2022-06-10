@@ -3,47 +3,20 @@ import './App.css';
 
 function App() {
 
-    const [breakLength, setBreakLength] = useState(5);
-    const [sessionLength, setSessionLength] = useState(25);
-    const [timerMode, setTimerMode] = useState(0); // 0 = session | 1 = break
-    const [isRunning, setRunning] = useState(false);
-    const [isBeeping, setBeeping] = useState(false);
-    const [beepingLength, setBeepingLength] = useState(5);
-    const [count, setCount] = useState(0);
-    const timeText = useRef();
-    const timeLabel = useRef();
-
     const timeMultiplier = 60;
 
-    useInterval(() => {
-        if (isBeeping) {
-            setBeepingLength(beepingLength - 1);
-            if (timeText.current?.classList.contains("red")) {
-                timeText.current?.classList.remove("red");
-                timeLabel.current?.classList.remove("red");
-            } else {
-                timeText.current?.classList.add("red");
-                timeLabel.current?.classList.add("red");
-            }
+    const defaultSessionLength = 25;
+    const defaultBreakLength = 5;
 
-            if (beepingLength > 0) return;
-            else if (beepingLength <= 0) {
-                setBeeping(false);
-                if (timerMode === 0) {
-                    setMode(1);
-                } else {
-                    setMode(0);
-                }
-                return;
-            }
-        }
-        if (count <= 0) {
-            setBeeping(true);
-            setBeepingLength(5);
-        } else {
-            setCount(count - 1);
-        }
-    }, isRunning ? 1000 : null);
+    const [count, setCount] = useState(defaultSessionLength * timeMultiplier);
+    const [sessionLength, setSessionLength] = useState(defaultSessionLength);
+    const [breakLength, setBreakLength] = useState(defaultBreakLength);
+    const [timerMode, setTimerMode] = useState(0); // 0 = session | 1 = break
+    const [isRunning, setRunning] = useState(false);
+
+    const timeText = useRef();
+    const timeLabel = useRef();
+    const beepAudio = useRef();
 
     const setMode = (mode) => {
         setTimerMode(mode);
@@ -54,7 +27,26 @@ function App() {
         }
     }
 
-    const startTimer = () => {
+    useInterval(() => {
+
+        if (count < 60) {
+            timeText.current?.classList.toggle("red");
+            timeLabel.current?.classList.toggle("red");
+        }
+
+        if (count < 0) {
+            beepAudio.current?.play();
+            if (timerMode === 0) {
+                setMode(1)
+            } else {
+                setMode(0)
+            }
+        } else {
+            setCount(count - 1);
+        }
+    }, isRunning ? 1000 : null);
+
+    function startTimer() {
         if (count === 0)
             setCount(sessionLength * timeMultiplier);
         setRunning(true);
@@ -62,13 +54,16 @@ function App() {
 
     const stopTimer = () => {
         setRunning(false);
-        setBeeping(false);
     }
 
     const resetTimer = () => {
         if (isRunning) stopTimer();
-        setCount(0);
         setTimerMode(0);
+        setBreakLength(defaultBreakLength);
+        setSessionLength(defaultSessionLength);
+        setCount(defaultSessionLength * timeMultiplier);
+        beepAudio.current?.pause();
+        beepAudio.current.currentTime = 0;
     }
 
     function useInterval(callback, delay) {
@@ -92,6 +87,15 @@ function App() {
         }, [delay]);
     }
 
+    function getCountAsTimeString() {
+        let minutes = Math.floor(count / timeMultiplier);
+        let seconds = count - minutes * timeMultiplier;
+        seconds = seconds < 10 ? '0' + seconds : seconds;
+        minutes = minutes < 10 ? '0' + minutes : minutes;
+        return minutes + ':' + seconds;
+    }
+
+
     return (
         <div className="vertical timer-box">
 
@@ -99,17 +103,17 @@ function App() {
                 <div className="vertical timer-length-item">
                     <p id="break-label" className="timer-length-item-label">Break length</p>
                     <div className="horizontal timer-length-item-switcher">
-                        <button className={isRunning ? "none-click" : undefined} id="break-decrement" onClick={() => {
+                        <button className={isRunning ? "none-click" : undefined} value="-" id="break-decrement" onClick={() => {
                             if (isRunning) return;
                             if (breakLength <= 1) return;
                             setBreakLength(breakLength - 1)
                         }}>
                             <i className="fa fa-arrow-down"></i>
                         </button>
-                        <p id="break-length">{breakLength}</p>
-                        <button className={isRunning ? "none-click" : undefined} id="break-increment" onClick={() => {
+                        <div id="break-length" defaultValue={defaultBreakLength}>{breakLength}</div>
+                        <button className={isRunning ? "none-click" : undefined} value="+" id="break-increment" onClick={() => {
                             if (isRunning) return;
-                            if (sessionLength >= 60) return;
+                            if (breakLength >= 60) return;
                             setBreakLength(breakLength + 1);
                         }}>
                             <i className="fa fa-arrow-up"></i>
@@ -119,18 +123,22 @@ function App() {
                 <div className="vertical timer-length-item">
                     <p id="session-label" className="timer-length-item-label">Session length</p>
                     <div className="horizontal timer-length-item-switcher">
-                        <button className={isRunning ? "none-click" : undefined} id="session-decrement" onClick={() => {
+                        <button className={isRunning ? "none-click" : undefined} value="-" id="session-decrement" onClick={() => {
                             if (isRunning) return;
                             if (sessionLength <= 1) return;
-                            setSessionLength(sessionLength - 1)
+                            let newLength = sessionLength - 1;
+                            setSessionLength(newLength)
+                            setCount(newLength * timeMultiplier);
                         }}>
                             <i className="fa fa-arrow-down"></i>
                         </button>
-                        <p id="session-length">{sessionLength}</p>
-                        <button className={isRunning ? "none-click" : undefined} id="session-increment" onClick={() => {
+                        <div id="session-length" defaultValue={defaultSessionLength}>{sessionLength}</div>
+                        <button className={isRunning ? "none-click" : undefined} value="+" id="session-increment" onClick={() => {
                             if (isRunning) return;
                             if (sessionLength >= 60) return;
-                            setSessionLength(sessionLength + 1);
+                            let newLength = sessionLength + 1;
+                            setSessionLength(newLength);
+                            setCount(newLength * timeMultiplier);
                         }}>
                             <i className="fa fa-arrow-up"></i>
                         </button>
@@ -141,11 +149,11 @@ function App() {
             <hr style={{width: "75%"}}/>
 
             <div className="vertical" style={{width: "50%"}}>
-                <h1 id="timer-label"
-                    ref={ref => timeLabel.current = ref}>{(isBeeping) ? "Time Up" : (timerMode === 0) ? "Session" : "Break"}</h1>
-                <h2 id="time-left" ref={ref => timeText.current = ref}>{
-                    new Date(count * 1000).toISOString().substr(14, 5)
-                }</h2>
+                <div id="timer-label" style={{color: (count <= 61) ? "red" : null}}
+                    ref={ref => timeLabel.current = ref}>{(timerMode === 0) ? "Session" : "Break"}</div>
+                <div id="time-left" style={{color: (count <= 61) ? "red" : null}} ref={ref => timeText.current = ref}>{
+                    getCountAsTimeString()
+                }</div>
             </div>
 
             <hr style={{width: "25%", margin: '0'}}/>
@@ -166,6 +174,12 @@ function App() {
                 </button>
             </div>
 
+            <audio
+                id="beep"
+                preload="auto"
+                ref={ref => beepAudio.current = ref}
+                src="https://raw.githubusercontent.com/freeCodeCamp/cdn/master/build/testable-projects-fcc/audio/BeepSound.wav"
+            />
         </div>
     );
 }
